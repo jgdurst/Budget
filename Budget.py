@@ -23,13 +23,15 @@ import datetime
 # Type (Payment, Sale, Return) --NO
 # Amount --YES
 
-db_file_path = r"C:\Users\jgdur\Documents\Budget Files\Budget_v2.accdb"
+db_file_path = r"C:\Users\jgdur\OneDrive\Budget\Budget_v2.accdb"
 connection_string = r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=%s;' % (db_file_path)
+
+
 
 
 def import_transactions(account, file_name):
     chase_date_parser = lambda x: pd.datetime.strptime(x, '%m/%d/%Y')
-    file_path = f'C:\\Users\\jgdur\\Documents\\Budget Files\\{account} Transactions\\{file_name}'
+    file_path = f'C:\\Users\\jgdur\\OneDrive\\Budget\\Budget Files\\{account} Transactions\\{file_name}'
 
     if (account == 'Checking' or account == 'Savings'):
         #import checking or savings transactions
@@ -51,7 +53,7 @@ def import_transactions(account, file_name):
     transactions['Description'] = transactions['Description'].map(lambda x: " ".join(str(x).split()).replace("'",""))
 
     try:
-        transactions['ID'] = transactions['PostingDate'].dt.date.map(str) \
+        transactions['TransID'] = transactions['PostingDate'].dt.date.map(str) \
                              + '_' \
                              + transactions['Amount'].map('{:0=10.2f}'.format).str.replace('-', 'n') \
                              + '_' \
@@ -60,8 +62,9 @@ def import_transactions(account, file_name):
         print(f'Invalid data values in Date, Description, or Amount columns. {len(transactions.index)} rows found.')
 
 
-    if transactions['ID'].duplicated().any():
-        print(transactions['ID'][transactions['ID'].duplicated() == True])
+    if transactions['TransID'].duplicated().any():
+        print('Duplicated transactions found: \n'
+              + transactions['TransID'][transactions['TransID'].duplicated() == True])
     else:
         transactions['IsParentTrans'] = transactions.apply(lambda row: '|' in row.Category, axis=1)
         return transactions
@@ -92,7 +95,7 @@ def insert_transactions(account, trans_to_insert, logging=False):
         '''
     )
     if not cursor.fetchone():
-        print(f'{trans.ID}\n--\'{account}\' is not a valid Account.')
+        print(f'{trans.TransID}\n--\'{account}\' is not a valid Account.')
         return
 
     cnt_new = 0
@@ -121,7 +124,7 @@ def insert_transactions(account, trans_to_insert, logging=False):
             if logging:
                 print('Invalid Category')
             cnt_invalid_category += 1
-            print(f'{trans.ID}\n--\'{trans.Category}\' is not a valid Category.')
+            print(f'{trans.TransID}\n--\'{trans.Category}\' is not a valid Category.')
             continue
 
 
@@ -153,23 +156,23 @@ def insert_transactions(account, trans_to_insert, logging=False):
         if (not invalid_subtrans):
             try:
                 if logging:
-                    print(f"{trans.ID}, {trans.PostingDate}, {trans.Description}, {trans.Amount}, '', {check}, {account}, {adj_category}")
+                    print(f"{trans.TransID}, {trans.PostingDate}, {trans.Description}, {trans.Amount}, '', {check}, {account}, {adj_category}")
                 cursor.execute(
                     f'''
                     INSERT INTO Transaction (TransID, TransactionDate, Description, Amount, Memo, Check, Account, Category)
-                    VALUES ('{trans.ID}', '{trans.PostingDate}', '{trans.Description}', {trans.Amount}, '', {check}, '{account}', '{adj_category}');
+                    VALUES ('{trans.TransID}', '{trans.PostingDate}', '{trans.Description}', {trans.Amount}, '', {check}, '{account}', '{adj_category}');
                     '''
                 )
                 if logging:
                     print('Success')
                 cnt_new += 1
-                # print(f'{trans.ID}\n--Successfully uploaded.')
+                # print(f'{trans.TransID}\n--Successfully uploaded.')
 
                 for category, amount in category_spend_dict.items():
                     cursor.execute(
                         f'''
                         INSERT INTO SubTransaction (ParentTransID, Category, Amount)
-                        VALUES ('{trans.ID}', '{category}', {amount});
+                        VALUES ('{trans.TransID}', '{category}', {amount});
                         '''
                     )
 
@@ -177,7 +180,7 @@ def insert_transactions(account, trans_to_insert, logging=False):
                 if logging:
                     print('Duplicate')
                 cnt_exist += 1
-                # print(f'{trans.ID}\n--Record already exists.')
+                # print(f'{trans.TransID}\n--Record already exists.')
                 continue
         else:
             if logging:
@@ -323,6 +326,12 @@ def get_trans_summ_by_period(year, month):
     return pd.read_sql(query, conn)
 
 
+def validate_unique_trans(df_validate):
+    df_trans = get_data('Transaction')
+    for row in df_validate.itertuples():
+        if (df_trans['TransID'].isin([row.TransID]).any()):
+            print('Record already exists in DB: ' + row.TransID)
+
 
 def insert_new_year(year):
     conn = pyodbc.connect(connection_string)
@@ -398,7 +407,13 @@ def main():
     # import_insert_transactions('CreditCard', 'CreditCard Transactions.csv')
     # import_insert_transactions('Checking', 'Checking Transactions.csv')
     import_insert_transactions('Savings', 'Savings Transactions.csv')
-
+    # mytrans = import_transactions('CreditCard', 'CreditCard Transactions.csv')
+    # mytrans = import_transactions('Checking', 'Checking Transactions.csv')
+    # mytrans = import_transactions('Savings', 'Savings Transactions.csv')
+    # validate_unique_trans(mytrans)
+    # df = get_data('Transaction')
+    # print(df.head())
+    # single_allocation('Rent', 2021, 1, 0, 'set')
 
 if __name__ == '__main__':
     main()
