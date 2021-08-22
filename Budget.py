@@ -83,6 +83,8 @@ def import_allocations(file_name):
 
 
 def insert_transactions(account, trans_to_insert, logging=False):
+    print(f"Uploading transactions... {account}")
+
     #connect to database
     conn = pyodbc.connect(connection_string)
 
@@ -188,7 +190,7 @@ def insert_transactions(account, trans_to_insert, logging=False):
             cnt_invalid_subtrans += 1
 
     conn.commit()
-
+    print(f"{account} upload completed.")
     print(f'Total Records: {len(trans_to_insert.index)}')
     if cnt_new > 0:
         print(f'New records: {cnt_new}')
