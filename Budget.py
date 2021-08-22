@@ -403,18 +403,6 @@ def get_month_name(month):
 
 
 
-def main():
-    # import_insert_transactions('CreditCard', 'CreditCard Transactions.csv')
-    # import_insert_transactions('Checking', 'Checking Transactions.csv')
-    import_insert_transactions('Savings', 'Savings Transactions.csv')
-    # mytrans = import_transactions('CreditCard', 'CreditCard Transactions.csv')
-    # mytrans = import_transactions('Checking', 'Checking Transactions.csv')
-    # mytrans = import_transactions('Savings', 'Savings Transactions.csv')
-    # validate_unique_trans(mytrans)
-    # df = get_data('Transaction')
-    # print(df.head())
-    # single_allocation('Rent', 2021, 1, 0, 'set')
-
 if __name__ == '__main__':
-    main()
+    pass
 
