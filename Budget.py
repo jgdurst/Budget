@@ -24,11 +24,13 @@ from datetime import datetime
 # Type (Payment, Sale, Return) --NO
 # Amount --YES
 
-budget_path = r'C:\Users\jgdur\OneDrive\Budget'
+budget_path = r'C:\Users\James\OneDrive\Budget'
 budget_file_path = budget_path + "\\Budget Files"
 db_file_name = 'Budget_v2.accdb'
 db_file_path = budget_path + f'\\{db_file_name}'
 connection_string = r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=%s;' % (db_file_path)
+
+
 
 def import_transactions(account, file_name):
     print(f"Importing transactions... {account}")
