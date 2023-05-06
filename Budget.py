@@ -5,57 +5,42 @@ import pyodbc
 import math
 import datetime as dt
 from datetime import datetime
+import yaml
 
-
-#Checking/Savings Columns:
-# Details (Debit/Credit) --NO
-# Posting Date --YES
-# Description  --YES
-# Amount --YES
-# Type (ATM, ACH_Credit/Debit) --NO
-# Balance --NO
-# Check or Slip # --YES
-
-#Credit Card Columns:
-# Transaction Date --NO
-# Post Date --YES
-# Description --YES
-# Category (Chase's guess) --NO
-# Type (Payment, Sale, Return) --NO
-# Amount --YES
 
 budget_path = r'C:\Users\James\OneDrive\Budget'
-budget_file_path = budget_path + "\\Budget Files"
-db_file_name = 'Budget_v2.accdb'
-db_file_path = budget_path + f'\\{db_file_name}'
+budget_file_path = budget_path + '\\Budget Files'
+db_file_name = 'Budget_v2.accdb' #deprecated
+db_file_path = budget_path + f'\\{db_file_name}' #deprecated
 connection_string = r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=%s;' % (db_file_path)
+config_file = "config.yml"
 
-
-
-def import_transactions(account, file_name):
-    print(f"Importing transactions... {account}")
-    chase_date_parser = lambda x: datetime.strptime(x, '%m/%d/%Y')
-    file_path = f'{budget_file_path}\\{account} Transactions\\{file_name}'
-
-    if (account == 'Checking' or account == 'Savings'):
-        #import checking or savings transactions
-        transactions = pd.read_csv(file_path, parse_dates=['Posting Date'], date_parser=chase_date_parser,
-                                   usecols=['Posting Date', 'Description', 'Amount', 'Check or Slip #', 'Comment', 'Tags', 'Category'],
-                                   keep_default_na=False
-        )
-        transactions.columns = ['PostingDate', 'Description', 'Amount', 'Check', 'Comment', 'Tags', 'Category']
+def get_config():
+    if os.path.exists(config_file):
+        with open(config_file, "r") as config_fstream:
+            try:
+                config = yaml.safe_load(config_fstream)
+                print(config['database']['connection_string'])
+            except Exception as e:
+                print(f"Failed to read {config_file}")
+                print(e)
     else:
-        #import credit card transactions
-        transactions = pd.read_csv(file_path, parse_dates=['Post Date'], date_parser=chase_date_parser,
-                                   usecols=['Post Date', 'Description', 'Amount', 'Comment', 'Tags', 'Category'],
-                                   keep_default_na=False
-        )
-        transactions.columns = ['PostingDate', 'Description', 'Amount', 'Comment', 'Tags', 'Category']
-        transactions['Check'] = 0
+        print(f"'{config_file}' does not exist. Rerun ConnectDatabase")
+
+def import_transactions(file_name, logging=False):
+    print(f"Importing transactions...")
+    chase_date_parser = lambda x: datetime.strptime(x, '%m/%d/%Y')
+    file_path = file_name
+
+    transactions = pd.read_csv(file_path, parse_dates=['TransactionDate'], date_parser=chase_date_parser,
+                           usecols=['TransactionDate', 'Description', 'Amount', 'Check', 'Account', 'Comment', 'Category'],
+                           keep_default_na=False
+                           )
+    transactions['Check'] = 0
     transactions['Description'] = transactions['Description'].map(lambda x: " ".join(str(x).split()).replace("'",""))
 
     try:
-        transactions['TransID'] = transactions['PostingDate'].dt.date.map(str) \
+        transactions['TransID'] = transactions['TransactionDate'].dt.date.map(str) \
                              + '_' \
                              + transactions['Amount'].map('{:0=10.2f}'.format).str.replace('-', 'n') \
                              + '_' \
@@ -92,25 +77,29 @@ def import_allocations(file_name):
         print(f'Expected columns not found in dataset:\n{expected_cols}')
         return None
 
-def insert_transactions(account, trans_to_insert, logging=False):
-    print(f"Uploading transactions... {account}")
+def insert_transactions(trans_to_insert, logging=False):
+    print(f"Uploading transactions... ")
 
     if trans_to_insert is None:
         print("No data to insert.")
         return None
 
+    #get accounts in import data
+    accounts = trans_to_insert['Account'].unique()
+
     #connect to database
     conn = pyodbc.connect(connection_string)
     cursor = conn.cursor()
-    cursor.execute(
-        f'''
-        SELECT Account.Account FROM Account
-        WHERE Account.Account = '{account}';
-        '''
-    )
-    if not cursor.fetchone():
-        print(f'{trans.TransID}\n--\'{account}\' is not a valid Account.')
-        return
+    for account in accounts:
+        cursor.execute(
+            f'''
+            SELECT Account.Account FROM Account
+            WHERE Account.Account = '{account}';
+            '''
+        )
+        if not cursor.fetchone():
+            print(f'{trans_to_insert.TransID}\n--\'{account}\' is not a valid Account.')
+            return
 
     cnt_new = 0
     cnt_exist = 0
@@ -127,35 +116,6 @@ def insert_transactions(account, trans_to_insert, logging=False):
         invalid_tag = False
         sum_subtrans_amount = 0
         category_spend_dict = {}
-        tag_list = []
-
-        cursor.execute(
-            f'''
-            SELECT Category.Category FROM Category
-            WHERE Category.Category = '{trans.Category}';
-            '''
-        )
-        if trans.Category and not (trans.IsParentTrans or cursor.fetchone()):
-            if logging:
-                print('Invalid Category')
-            cnt_invalid_category += 1
-            print(f'{trans.TransID}\n--\'{trans.Category}\' is not a valid Category.')
-            continue
-
-        if trans.Tags is not None and trans.Tags != "":
-            tag_list = trans.Tags.split(":")
-            for tag in tag_list:
-                cursor.execute(
-                    f'''
-                    SELECT Tag.ID FROM Tag
-                    WHERE Tag.TagName = '{tag}';
-                    '''
-                )
-                if not cursor.fetchone():
-                    print(f'Invalid Tag "{tag}" at {trans.TransID}')
-                    cnt_invalid_tag += 1
-                    invalid_tag = True
-                    break
             
         if trans.IsParentTrans:
             adj_category = ''
@@ -178,47 +138,42 @@ def insert_transactions(account, trans_to_insert, logging=False):
                     else:
                         sum_subtrans_amount += float(amount)
                         category_spend_dict[category] = amount
-            # if (sum_subtrans_amount != trans.Amount):
-            #     invalid_subtrans = True
+
         else:
+            cursor.execute(
+                f'''
+                SELECT Category.Category FROM Category
+                WHERE Category.Category = '{trans.Category}';
+                '''
+            )
+            if trans.Category and not (cursor.fetchone()):
+                if logging:
+                    print('Invalid Category')
+                cnt_invalid_category += 1
+                print(f'{trans.TransID}\n--\'{trans.Category}\' is not a valid Category.')
+                continue
             adj_category = trans.Category
 
-        if (not (invalid_subtrans or invalid_tag)):
+        if (not (invalid_subtrans)):
             try:
                 if logging:
-                    print(f"{trans.TransID}, {trans.PostingDate}, {trans.Description}, {trans.Amount}, {trans.Comment}, {check}, {account}, {adj_category}")
+                    print(f"{trans.TransID}, {trans.TransactionDate}, {trans.Description}, {trans.Amount}, {trans.Comment}, {check}, {trans.Account}, {adj_category}")
                 cursor.execute(
                     f'''
                     INSERT INTO Transaction (TransID, TransactionDate, Description, Amount, Comment, Check, Account, Category)
-                    VALUES ('{trans.TransID}', '{trans.PostingDate}', '{trans.Description}', {trans.Amount}, '{trans.Comment}', {check}, '{account}', '{adj_category}');
+                    VALUES ('{trans.TransID}', '{trans.TransactionDate}', '{trans.Description}', {trans.Amount}, '{trans.Comment}', {check}, '{trans.Account}', '{adj_category}');
                     '''
                 )
                 cnt_new += 1
 
-                for category, amount in category_spend_dict.items():
-                    cursor.execute(
-                        f'''
-                        INSERT INTO SubTransaction (ParentTransID, Category, Amount)
-                        VALUES ('{trans.TransID}', '{category}', {amount});
-                        '''
-                    )
-                for tag in tag_list:
-                    cursor.execute(
-                        f'''
-                        SELECT Tag.ID
-                        FROM Tag
-                        WHERE (
-                            Tag.TagName = '{tag}'
-                        );
-                        '''
-                    )
-                    insert_tag = cursor.fetchone()[0]
-                    cursor.execute(
-                        f'''
-                        INSERT INTO TransactionTag (TransID, TagID)
-                        VALUES ('{trans.TransID}', {insert_tag});
-                        '''
-                    )
+                if trans.IsParentTrans:
+                    for category, amount in category_spend_dict.items():
+                        cursor.execute(
+                            f'''
+                            INSERT INTO SubTransaction (ParentTransID, Category, Amount)
+                            VALUES ('{trans.TransID}', '{category}', {amount});
+                            '''
+                        )
                 
             except pyodbc.IntegrityError:
                 if logging:
@@ -228,7 +183,7 @@ def insert_transactions(account, trans_to_insert, logging=False):
                 continue
 
     conn.commit()
-    print(f"{account} upload completed.")
+    print(f"Transactions upload completed.")
     print(f'Total Records: {len(trans_to_insert.index)}')
     if cnt_new > 0:
         print(f'New records: {cnt_new}')
@@ -240,10 +195,6 @@ def insert_transactions(account, trans_to_insert, logging=False):
         print(f'Records with Invalid Subtransactions: {cnt_invalid_subtrans}')
     if cnt_invalid_tag > 0:
         print(f'Records with Invalid Tags: {cnt_invalid_tag}')
-
-def import_insert_transactions(account, file_name, logging=False):
-    trans_data = import_transactions(account, file_name)
-    insert_transactions(account, trans_data)
 
 def single_allocation(category, year, month, amount, alloc_type):
     conn = pyodbc.connect(connection_string)
