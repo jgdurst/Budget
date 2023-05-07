@@ -1,3 +1,4 @@
 database:
   type: MSAccess
-  connection_string: "Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=%s;C:\\Users\\James\\OneDrive\\Budget\\Budget_v2.accdb"
+  connection_string: Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=C:\Users\James\OneDrive\Budget\Budget_v2.accdb;
+working_dir: C:\Users\James\OneDrive\Budget\Budget Files
