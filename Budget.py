@@ -6,6 +6,7 @@ import math
 import datetime as dt
 from datetime import datetime
 import yaml
+import tkinter.filedialog 
 
 
 
@@ -23,6 +24,12 @@ class Budget:
         self.config = self._read_config()
         self.db_connection_string = self.config["database"]["connection_string"]
         self.working_dir = self.config["working_dir"]
+        try:
+            self.test_db_connection()
+            self.test_working_dir()
+        except:
+            print("config.yml has invalid parameters. Attempting to regenerate. config_backup.yml will become the existing copy.")
+            self._gen_config()
 
     def get_config_file(self):
         return self.config_file
@@ -44,6 +51,21 @@ class Budget:
         else:
             print(f"'{self.config_file}' does not exist. You may want to re-run ConnectDatabase.")
             raise FileNotFoundError(self.config_file)
+
+    def _gen_config(self):
+        os.system("copy config.yml config_backup.yml")
+        budget_dir = tkinter.filedialog.askdirectory(initialdir=f"{os.environ['USERPROFILE']}")
+        if os.path.exists(budget_dir):
+            budget_db_path = budget_dir + "/Budget_v2.accdb"
+            budget_work_path = budget_dir + "/Budget Files"
+            if os.path.exists(budget_db_path) and os.path.exists(budget_work_path):
+                output = "database:\n"
+                output += "  type: MSAccess\n"
+                output += "  connection_string: Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=" + f"{budget_db_path};\n"
+                output += f"working_dir: {budget_work_path}"
+                with open("config.yml", "w") as fid_config:
+                    fid_config.write(output)
+                    print("config.yml regenerated.")
 
     def import_transactions(self, file_path, logging=False):
         print(f"Importing transactions...")
@@ -370,6 +392,11 @@ class Budget:
     def test_db_connection(self):
         print(self.db_connection_string)
         conn = pyodbc.connect(self.db_connection_string)
+
+    def test_working_dir(self):
+        print(self.working_dir)
+        if not os.path.exists(self.working_dir):
+            raise FileNotFoundError(f"{self.working_dir}")
 
 def _get_current_year():
     return dt.date.today().year
