@@ -242,9 +242,9 @@ class Budget:
         cursor.execute(
             f'''
             SELECT NULL
-            FROM Allocation
+            FROM Category
             WHERE (
-                Allocation.Category = '{category}'
+                Category.Category = '{category}'
             );
             '''
         )
@@ -362,7 +362,7 @@ class Budget:
             self._insert_allocation_categories(year, i)
 
     def _insert_allocation_categories(self, year, month):
-        category_data = self.get_data("Allocation")
+        category_data = self.get_data("Category")
 
         conn = pyodbc.connect(self.db_connection_string)
         cursor = conn.cursor()
@@ -382,8 +382,8 @@ class Budget:
             if not cursor.fetchone():
                 cursor.execute(
                     f'''
-                    INSERT INTO Allocation (Category, Section, AllocationYear, AllocationMonth, Amount)
-                    VALUES ('{row.Category}', '{row.Section}', {year}, {month}, 0);
+                    INSERT INTO Allocation (Category, AllocationYear, AllocationMonth, Amount)
+                    VALUES ('{row.Category}', {year}, {month}, 0);
                     '''
                 )
 
