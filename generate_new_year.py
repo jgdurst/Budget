@@ -1,6 +1,11 @@
-from tkinter.filedialog import askopenfilename
+from tkinter import *
 import Budget as budget_lib
+import sys
+
 budget = budget_lib.Budget()
-filename = askopenfilename(initialdir=f"{budget.get_working_dir()}\\Allocations")
-allocations = budget.import_allocations(filename)
-budget.mass_allocation(allocations, 'set')
+input_year = sys.argv[1]
+try:
+    budget._insert_new_year(int(input_year))
+except Exception as e:
+    print(f"'{input_year}' is not a valid year. {e}")
+

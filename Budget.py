@@ -25,8 +25,8 @@ class Budget:
         self.db_connection_string = self.config["database"]["connection_string"]
         self.working_dir = self.config["working_dir"]
         try:
-            self.test_db_connection()
-            self.test_working_dir()
+            self._test_db_connection()
+            self._test_working_dir()
         except:
             print("config.yml has invalid parameters. Attempting to regenerate. config_backup.yml will become the existing copy.")
             self._gen_config()
@@ -389,11 +389,11 @@ class Budget:
 
         conn.commit()
 
-    def test_db_connection(self):
+    def _test_db_connection(self):
         print(self.db_connection_string)
         conn = pyodbc.connect(self.db_connection_string)
 
-    def test_working_dir(self):
+    def _test_working_dir(self):
         print(self.working_dir)
         if not os.path.exists(self.working_dir):
             raise FileNotFoundError(f"{self.working_dir}")

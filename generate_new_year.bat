@@ -3,6 +3,6 @@ title Upload Allocations
 
 call activate budget
 
-python upload_allocations_set.py
+python generate_new_year.py %1
 
 pause
