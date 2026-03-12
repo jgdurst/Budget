@@ -3,6 +3,6 @@ title Upload Allocations
 
 call activate budget
 
-python upload_allocations_add.py
+python code\upload_allocations_add.py
 
 pause
