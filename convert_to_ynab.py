@@ -18,7 +18,7 @@ for i,file_path_str in enumerate(file_paths):
     for col in available_cols:
         if (col == 'Posting Date'):
             rename_dict['Posting Date'] = 'Date'
-        if (col == 'Posting Date'):
+        if (col == 'Post Date'):
             rename_dict['Post Date'] = 'Date'
 
     df = pd.read_csv(file_path, index_col=False)
