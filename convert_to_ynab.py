@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from pathlib import Path
 
-optional_cols = ['Posting Date','Post Date','Description','Amount']
+optional_cols = ['Posting Date','Post Date','Posted Date','Description','Amount']
 output_cols = ['Date','Payee','Amount']
 rename_dict = {
     "Description": "Payee"
@@ -20,10 +20,14 @@ for i,file_path_str in enumerate(file_paths):
             rename_dict['Posting Date'] = 'Date'
         if (col == 'Post Date'):
             rename_dict['Post Date'] = 'Date'
+        if (col == 'Posted Date'):
+            rename_dict['Posted Date'] = 'Date'
 
     df = pd.read_csv(file_path, index_col=False)
     # print(df.iloc[0])
     df.rename(columns=rename_dict, inplace=True)
+    if 'Amount' not in df.columns:
+        df["Amount"] = df["Credit"].fillna(0) - df["Debit"].fillna(0)
     print(df[output_cols].iloc[0])
 
     dir_path = os.path.dirname(file_path)
